@@ -884,60 +884,58 @@ function toggleVolChecker() {
 function calcVolumetric() {
   if (!_currentCalc || !_currentCalc.isPerKg) return;
 
-  // 1. Get Values
+  // 1. Get Dimension Values
   const L = parseFloat(document.getElementById('vol-l').value);
   const B = parseFloat(document.getElementById('vol-b').value);
   const H = parseFloat(document.getElementById('vol-h').value);
   
-  // 2. SILENT VALIDATION (No pop-ups)
+  // 2. SILENT VALIDATION
   if (isNaN(L) || isNaN(B) || isNaN(H) || L <= 0 || B <= 0 || H <= 0) {
-    // Just hide the results and stop if inputs are incomplete
     document.getElementById('vol-result-grid').style.display = 'none';
     document.getElementById('vol-warning').classList.remove('show');
     document.getElementById('vol-recalc').classList.remove('show');
     return;
   }
 
-  // 3. Get Gross Weight (Matches your second calculator's ID)
-  const grossWtRaw = parseFloat(document.getElementById('gross-weight').value);
+  // 3. Get Weight from the MAIN input box
+  // Changed 'gross-weight' to 'actual-weight' to match your main calculator
+  const weightInput = document.getElementById('actual-weight');
+  const grossWtRaw = weightInput ? parseFloat(weightInput.value) : 0;
   const grossWt    = (!isNaN(grossWtRaw) && grossWtRaw > 0) ? grossWtRaw : _currentCalc.slabMidpoint;
   
   const volWt      = (L * B * H) / 5000;
   const chargeWt   = Math.max(grossWt, volWt);
 
-  // 4. Update the Volumetric Display Box
+  // 4. Update the Volumetric UI
   document.getElementById('vol-gross-disp').textContent  = grossWt.toFixed(2) + ' kg';
   document.getElementById('vol-vol-disp').textContent    = volWt.toFixed(2) + ' kg';
   document.getElementById('vol-charge-disp').textContent = chargeWt.toFixed(2) + ' kg';
   document.getElementById('vol-result-grid').style.display = 'grid';
 
-  // 5. UPDATE THE MAIN CALCULATION
+  // 5. Logic for Volumetric vs Actual
   if (volWt > grossWt) {
-    // Push the higher weight to the main bill
     _currentCalc.slabMidpoint = chargeWt; 
     
     document.getElementById('vol-charge-bold').textContent = chargeWt.toFixed(2);
     document.getElementById('vol-warning').classList.add('show');
     
-    // Internal Box Calculations (Mini-Total)
-    const surcharge = _currentSurcharge || 75; // Uses your surcharge variable
+    const surcharge = _currentSurcharge || 75;
     const csbOn     = document.getElementById('csb-toggle').checked;
     const newBase   = _currentCalc.baseRatePerKg * chargeWt;
     const newWar    = surcharge * chargeWt;
     const newSub    = newBase + newWar + (csbOn ? 50 : 0);
-    const newTotal  = newSub * 1.18; // Includes GST
+    const newTotal  = newSub * 1.18;
 
     document.getElementById('vol-recalc-val').textContent   = '₹' + formatNum(newBase) + ' + war ₹' + formatNum(newWar);
     document.getElementById('vol-recalc-total').textContent = '₹' + formatNum(newTotal);
     document.getElementById('vol-recalc').classList.add('show');
   } else {
-    // Reset to gross weight if actual is higher
     _currentCalc.slabMidpoint = grossWt;
     document.getElementById('vol-warning').classList.remove('show');
     document.getElementById('vol-recalc').classList.remove('show');
   }
 
-  // 6. REFRESH THE MAIN BILL AT THE TOP
+  // 6. UPDATE THE MAIN TABLE
   recalcBreakdown();
 }
   
