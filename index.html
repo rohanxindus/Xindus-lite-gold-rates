@@ -770,42 +770,45 @@ function calculate() {
     const isPerKg  = slabMeta ? slabMeta.isPerKg : false;
     const prov     = PROVINCE_NAMES[zoneData.province] || zoneData.province;
 
+    // UI Updates
     document.getElementById('r-zone').textContent  = zoneData.zone;
     document.getElementById('r-prov').textContent  = zoneData.province + ' — ' + prov;
     const airportNames = { YYZ: 'YYZ · Toronto Pearson', YVR: 'YVR · Vancouver', YUL: 'YUL · Montreal', YYC: 'YYC · Calgary', YEG: 'YEG · Edmonton', YHZ: 'YHZ · Halifax' };
     document.getElementById('r-entry').innerHTML = '<span class="entry-pill">✈ ' + (airportNames[zoneData.entry] || zoneData.entry) + '</span>';
     document.getElementById('r-slab').textContent  = slabVal + ' kg';
 
-    // ... (Keep the top part of your setTimeout the same)
+    // DIRECT MULTIPLICATION LOGIC
+    // Get the weight specifically from the input field
+    const enteredWt = parseFloat(document.getElementById('actual-weight').value);
+    
+    // If it's a "per kg" slab, use the entered weight. Fallback to slab midpoint if empty.
+    const weightToStore = (isPerKg && !isNaN(enteredWt) && enteredWt > 0) 
+                          ? enteredWt 
+                          : getSlabMidpoint(slabVal);
 
     _currentCalc = { 
         baseRatePerKg: baseRate, 
         isPerKg, 
         slabLabel: slabVal, 
-        slabMidpoint: getSlabMidpoint(slabVal) 
+        slabMidpoint: weightToStore 
     };
 
-    // --- ADD THESE RESET LINES HERE ---
-    // This ensures that when a user clicks 'Calculate' for a NEW weight, 
-    // it clears any previous volumetric numbers from the boxes.
+    // UI Resets for Volumetric Section
     document.getElementById('vol-l').value = '';
     document.getElementById('vol-b').value = '';
     document.getElementById('vol-h').value = '';
-    // ----------------------------------
-
-    document.getElementById('csb-toggle-row').style.display = 'flex';
-    document.getElementById('vol-checker').style.display     = isPerKg ? 'block' : 'none';
-    document.getElementById('row-rate-per-kg').style.display = isPerKg ? 'flex' : 'none';
-
-    document.getElementById('csb-toggle').checked = false;
-    
-    // This part you already have is good - it hides the result boxes
     document.getElementById('vol-result-grid').style.display = 'none';
     document.getElementById('vol-warning').classList.remove('show');
     document.getElementById('vol-recalc').classList.remove('show');
     document.getElementById('vol-body').classList.remove('open');
     document.getElementById('vol-chevron').classList.remove('open');
 
+    document.getElementById('csb-toggle-row').style.display = 'flex';
+    document.getElementById('vol-checker').style.display     = isPerKg ? 'block' : 'none';
+    document.getElementById('row-rate-per-kg').style.display = isPerKg ? 'flex' : 'none';
+    document.getElementById('csb-toggle').checked = false;
+
+    // Trigger Breakdown and Show Result
     recalcBreakdown();
     setLoading(false);
     showResult();
@@ -818,17 +821,20 @@ function recalcBreakdown() {
   const surchargeRate = _currentSurcharge || 75;
   const csbOn = document.getElementById('csb-toggle').checked;
 
-  // Use the weight stored in _currentCalc (which handles the Actual vs Volumetric logic)
+  // The 'slabMidpoint' variable now holds the weight we want to multiply.
+  // This will be either the Actual weight (from Calculate) or the Volumetric weight (from your Button).
   const weightForCalc = slabMidpoint;
 
   let baseFreight, warSurcharge;
 
   if (isPerKg) {
+    // Multiplies Entered Weight (or Volumetric) by the rate
     baseFreight = baseRatePerKg * weightForCalc;
     warSurcharge = surchargeRate * weightForCalc;
     document.getElementById('r-rate-per-kg').textContent = '₹' + formatNum(baseRatePerKg) + '/kg';
     document.getElementById('base-label').innerHTML = '<span class="dot"></span>Base Freight';
   } else {
+    // Flat Rate Logic (for lower slabs)
     baseFreight = baseRatePerKg;
     warSurcharge = surchargeRate * weightForCalc;
     document.getElementById('base-label').innerHTML = '<span class="dot"></span>Base Freight';
@@ -839,6 +845,7 @@ function recalcBreakdown() {
   const gst      = subtotal * 0.18;
   const total    = subtotal + gst;
 
+  // Update Result Table UI
   document.getElementById('r-base').textContent    = '₹' + formatNum(baseFreight);
   document.getElementById('r-war').textContent     = '₹' + formatNum(warSurcharge);
   document.getElementById('row-csb').style.display = csbExtra ? 'flex' : 'none';
@@ -852,8 +859,8 @@ function recalcBreakdown() {
 
   document.getElementById('gst-note').textContent = '* GST @ 18% applicable on freight + surcharges' + (csbOn ? ' · CSB-5 clearance ₹50 included' : '');
 
-  // Keep this here to handle UI warnings, but it won't trigger the calculation loop
-  // if you've already clicked the button.
+  // NOTE: We do NOT call calcVolumetric() here to avoid infinite loops.
+  // The volumetric calculation is only triggered by your "Apply" button.
 }
 
 function toggleBreakdown() {
