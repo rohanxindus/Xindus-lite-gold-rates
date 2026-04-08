@@ -368,22 +368,29 @@ body{font-family:var(--sans);min-height:100vh;background:var(--blue-deep);overfl
             <span class="total-val"><span class="total-currency">&#8377;</span><span id="r-total">0</span></span>
           </div>
         </div>
-        <div class="vol-checker" id="vol-checker" style="display:none">
+       <div class="vol-checker" id="vol-checker" style="display:none">
           <div class="vol-header" onclick="toggleVolChecker()">
             <span>&#128208; Check if going Volumetric</span>
             <span class="vol-chevron" id="vol-chevron">&#9662;</span>
           </div>
+          
           <div class="vol-body" id="vol-body">
             <div class="vol-inputs">
-              <div class="vol-field"><label for="vol-l">Length (cm)</label><input type="number" id="vol-l" class="vol-input" placeholder="L" min="0" step="0.1" oninput="calcVolumetric()"/></div>
-              <div class="vol-field"><label for="vol-b">Breadth (cm)</label><input type="number" id="vol-b" class="vol-input" placeholder="B" min="0" step="0.1" oninput="calcVolumetric()"/></div>
-              <div class="vol-field"><label for="vol-h">Height (cm)</label><input type="number" id="vol-h" class="vol-input" placeholder="H" min="0" step="0.1" oninput="calcVolumetric()"/></div>
+              <div class="vol-field"><label for="vol-l">Length (cm)</label><input type="number" id="vol-l" class="vol-input" placeholder="L" min="0" step="0.1"/></div>
+              <div class="vol-field"><label for="vol-b">Breadth (cm)</label><input type="number" id="vol-b" class="vol-input" placeholder="B" min="0" step="0.1"/></div>
+              <div class="vol-field"><label for="vol-h">Height (cm)</label><input type="number" id="vol-h" class="vol-input" placeholder="H" min="0" step="0.1"/></div>
             </div>
+        
+            <button type="button" onclick="calcVolumetric()" class="vol-calc-btn" style="width: 100%; margin: 10px 0; padding: 12px; background: #eab308; color: #000; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">
+              Apply Volumetric Weight
+            </button>
+        
             <div class="vol-result-grid" id="vol-result-grid" style="display:none">
               <div class="vol-chip"><div class="vol-chip-label">Gross Weight</div><div class="vol-chip-val" id="vol-gross-disp">&#8212;</div></div>
               <div class="vol-chip"><div class="vol-chip-label">Volumetric Wt.</div><div class="vol-chip-val" id="vol-vol-disp">&#8212;</div></div>
               <div class="vol-chip"><div class="vol-chip-label">Chargeable Wt.</div><div class="vol-chip-val highlight" id="vol-charge-disp">&#8212;</div></div>
             </div>
+        
             <div class="vol-warning" id="vol-warning">&#9888;&#65039; Volumetric weight exceeds gross weight. Chargeable weight is <strong id="vol-charge-bold">&#8212;</strong> kg.</div>
             <div class="vol-recalc" id="vol-recalc">&#8505;&#65039; Recalculated rate using chargeable weight: <strong id="vol-recalc-val">&#8212;</strong> &middot; Total Payable: <strong id="vol-recalc-total">&#8212;</strong></div>
           </div>
@@ -795,25 +802,17 @@ function recalcBreakdown() {
   const surchargeRate = _currentSurcharge || 75;
   const csbOn = document.getElementById('csb-toggle').checked;
 
-  // 1. Get the weight entered by customer (Actual or Volumetric)
-  const enteredWt = parseFloat(document.getElementById('actual-weight').value);
-  const weightForCalc = (!isNaN(enteredWt) && enteredWt > 0) ? enteredWt : slabMidpoint;
+  // Use the weight stored in _currentCalc (which handles the Actual vs Volumetric logic)
+  const weightForCalc = slabMidpoint;
 
   let baseFreight, warSurcharge;
 
   if (isPerKg) {
-    // 2. FREIGHT LOGIC: Simple multiplication of ENTERED weight × Rate
     baseFreight = baseRatePerKg * weightForCalc;
-    
-    // 3. SURCHARGE LOGIC: Also based on entered weight
     warSurcharge = surchargeRate * weightForCalc;
-
     document.getElementById('r-rate-per-kg').textContent = '₹' + formatNum(baseRatePerKg) + '/kg';
-    
-    // Keep the label clean as you requested earlier
     document.getElementById('base-label').innerHTML = '<span class="dot"></span>Base Freight';
   } else {
-    // Logic for Flat Rates (4.75kg and below)
     baseFreight = baseRatePerKg;
     warSurcharge = surchargeRate * weightForCalc;
     document.getElementById('base-label').innerHTML = '<span class="dot"></span>Base Freight';
@@ -824,7 +823,6 @@ function recalcBreakdown() {
   const gst      = subtotal * 0.18;
   const total    = subtotal + gst;
 
-  // Update UI Elements
   document.getElementById('r-base').textContent    = '₹' + formatNum(baseFreight);
   document.getElementById('r-war').textContent     = '₹' + formatNum(warSurcharge);
   document.getElementById('row-csb').style.display = csbExtra ? 'flex' : 'none';
@@ -838,8 +836,8 @@ function recalcBreakdown() {
 
   document.getElementById('gst-note').textContent = '* GST @ 18% applicable on freight + surcharges' + (csbOn ? ' · CSB-5 clearance ₹50 included' : '');
 
-  // Keep volumetric logic active
-  calcVolumetric();
+  // Keep this here to handle UI warnings, but it won't trigger the calculation loop
+  // if you've already clicked the button.
 }
 
 function toggleBreakdown() {
@@ -862,43 +860,64 @@ function toggleVolChecker() {
 
 function calcVolumetric() {
   if (!_currentCalc || !_currentCalc.isPerKg) return;
+
+  // 1. Get Values
   const L = parseFloat(document.getElementById('vol-l').value);
   const B = parseFloat(document.getElementById('vol-b').value);
   const H = parseFloat(document.getElementById('vol-h').value);
-  if (isNaN(L)||isNaN(B)||isNaN(H)||L<=0||B<=0||H<=0) {
+  
+  // 2. SILENT VALIDATION (No pop-ups)
+  if (isNaN(L) || isNaN(B) || isNaN(H) || L <= 0 || B <= 0 || H <= 0) {
+    // Just hide the results and stop if inputs are incomplete
     document.getElementById('vol-result-grid').style.display = 'none';
     document.getElementById('vol-warning').classList.remove('show');
     document.getElementById('vol-recalc').classList.remove('show');
     return;
   }
+
+  // 3. Get Gross Weight (Matches your second calculator's ID)
   const grossWtRaw = parseFloat(document.getElementById('gross-weight').value);
   const grossWt    = (!isNaN(grossWtRaw) && grossWtRaw > 0) ? grossWtRaw : _currentCalc.slabMidpoint;
+  
   const volWt      = (L * B * H) / 5000;
   const chargeWt   = Math.max(grossWt, volWt);
 
+  // 4. Update the Volumetric Display Box
   document.getElementById('vol-gross-disp').textContent  = grossWt.toFixed(2) + ' kg';
   document.getElementById('vol-vol-disp').textContent    = volWt.toFixed(2) + ' kg';
   document.getElementById('vol-charge-disp').textContent = chargeWt.toFixed(2) + ' kg';
   document.getElementById('vol-result-grid').style.display = 'grid';
 
+  // 5. UPDATE THE MAIN CALCULATION
   if (volWt > grossWt) {
+    // Push the higher weight to the main bill
+    _currentCalc.slabMidpoint = chargeWt; 
+    
     document.getElementById('vol-charge-bold').textContent = chargeWt.toFixed(2);
     document.getElementById('vol-warning').classList.add('show');
-    const surcharge = parseFloat(document.getElementById('war-surcharge').value) || 0;
+    
+    // Internal Box Calculations (Mini-Total)
+    const surcharge = _currentSurcharge || 75; // Uses your surcharge variable
     const csbOn     = document.getElementById('csb-toggle').checked;
     const newBase   = _currentCalc.baseRatePerKg * chargeWt;
     const newWar    = surcharge * chargeWt;
     const newSub    = newBase + newWar + (csbOn ? 50 : 0);
-    const newTotal  = newSub * 1.18;
+    const newTotal  = newSub * 1.18; // Includes GST
+
     document.getElementById('vol-recalc-val').textContent   = '₹' + formatNum(newBase) + ' + war ₹' + formatNum(newWar);
     document.getElementById('vol-recalc-total').textContent = '₹' + formatNum(newTotal);
     document.getElementById('vol-recalc').classList.add('show');
   } else {
+    // Reset to gross weight if actual is higher
+    _currentCalc.slabMidpoint = grossWt;
     document.getElementById('vol-warning').classList.remove('show');
     document.getElementById('vol-recalc').classList.remove('show');
   }
-}
 
+  // 6. REFRESH THE MAIN BILL AT THE TOP
+  recalcBreakdown();
+}
+  
 function formatNum(n) { return n.toFixed(2).replace(/B(?=(d{3})+(?!d))/g, ','); }
 
 function showResult() {
