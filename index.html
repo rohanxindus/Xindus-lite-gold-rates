@@ -776,14 +776,30 @@ function calculate() {
     document.getElementById('r-entry').innerHTML = '<span class="entry-pill">✈ ' + (airportNames[zoneData.entry] || zoneData.entry) + '</span>';
     document.getElementById('r-slab').textContent  = slabVal + ' kg';
 
-    _currentCalc = { baseRatePerKg: baseRate, isPerKg, slabLabel: slabVal, slabMidpoint: getSlabMidpoint(slabVal) };
+    // ... (Keep the top part of your setTimeout the same)
+
+    _currentCalc = { 
+        baseRatePerKg: baseRate, 
+        isPerKg, 
+        slabLabel: slabVal, 
+        slabMidpoint: getSlabMidpoint(slabVal) 
+    };
+
+    // --- ADD THESE RESET LINES HERE ---
+    // This ensures that when a user clicks 'Calculate' for a NEW weight, 
+    // it clears any previous volumetric numbers from the boxes.
+    document.getElementById('vol-l').value = '';
+    document.getElementById('vol-b').value = '';
+    document.getElementById('vol-h').value = '';
+    // ----------------------------------
 
     document.getElementById('csb-toggle-row').style.display = 'flex';
     document.getElementById('vol-checker').style.display     = isPerKg ? 'block' : 'none';
     document.getElementById('row-rate-per-kg').style.display = isPerKg ? 'flex' : 'none';
 
     document.getElementById('csb-toggle').checked = false;
-    ['vol-l','vol-b','vol-h'].forEach(id => document.getElementById(id).value = '');
+    
+    // This part you already have is good - it hides the result boxes
     document.getElementById('vol-result-grid').style.display = 'none';
     document.getElementById('vol-warning').classList.remove('show');
     document.getElementById('vol-recalc').classList.remove('show');
